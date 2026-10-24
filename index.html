@@ -1,0 +1,1372 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>특허도면 변환기</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --ink: #1d2433;
+    --muted: #6b7489;
+    --line: #dfe3ec;
+    --accent: #2f6fed;
+    --accent-soft: #e6eefe;
+    --good: #1a9b5b;
+    --warn: #d9822b;
+    --danger: #d64545;
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", system-ui, sans-serif;
+    font-size: 15px;
+  }
+  button { font: inherit; cursor: pointer; }
+  input, select { font: inherit; }
+
+  header {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    padding: 12px 20px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  header h1 { font-size: 20px; margin: 0; display: flex; align-items: center; gap: 8px; }
+  header h1 svg { width: 26px; height: 26px; color: var(--accent); }
+  .who { display: flex; gap: 10px; margin-left: auto; flex-wrap: wrap; }
+  .who label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+  .who input {
+    border: 1px solid var(--line); border-radius: 10px; padding: 7px 10px; width: 150px; color: var(--ink);
+  }
+
+  .app {
+    display: grid; grid-template-columns: 250px 1fr 300px; gap: 14px;
+    padding: 14px; height: calc(100% - 62px);
+  }
+  aside, main { min-height: 0; }
+  aside { display: flex; flex-direction: column; gap: 14px; overflow: auto; }
+  main { overflow: auto; }
+
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+  .step { display: flex; align-items: center; gap: 8px; font-weight: 700; margin: 0 0 10px; font-size: 16px; }
+  .step b {
+    display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-size: 14px;
+  }
+  .hint { color: var(--muted); font-size: 13px; line-height: 1.45; margin: 8px 0 0; }
+
+  .btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%;
+    border: 1px solid var(--line); background: #fff; color: var(--ink);
+    border-radius: 12px; padding: 10px 12px; font-weight: 600;
+  }
+  .btn:hover { border-color: var(--accent); }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .btn svg { width: 20px; height: 20px; flex: none; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.primary:hover { filter: brightness(1.07); }
+  .btn.big { padding: 14px; font-size: 16px; }
+  .btn + .btn { margin-top: 8px; }
+  .row { display: flex; gap: 8px; }
+  .row .btn + .btn { margin-top: 0; }
+  .icon-btn {
+    border: 1px solid var(--line); background: #fff; border-radius: 10px; padding: 6px 8px;
+    display: inline-flex; align-items: center; gap: 4px; color: var(--ink); font-size: 13px;
+  }
+  .icon-btn svg { width: 16px; height: 16px; }
+  .icon-btn:hover { border-color: var(--accent); }
+
+  .rot { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .rot button {
+    border: 1px solid var(--line); background: #fff; border-radius: 12px; padding: 8px 4px;
+    display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; color: var(--ink);
+  }
+  .rot button svg { width: 26px; height: 26px; color: var(--accent); }
+  .rot button:hover { border-color: var(--accent); }
+  .rot button:disabled { opacity: .4; cursor: not-allowed; }
+
+  .seg { display: flex; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .seg button { flex: 1; border: 0; background: #fff; padding: 8px 4px; font-size: 13px; color: var(--ink); }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button.on { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+
+  .sub { font-size: 13px; font-weight: 700; color: var(--muted); margin: 14px 0 6px; }
+  .views { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 8px; }
+  .views label { display: flex; align-items: center; gap: 6px; font-size: 14px; padding: 3px 0; cursor: pointer; }
+  .views input { width: 17px; height: 17px; accent-color: var(--accent); }
+
+  .fileinfo { font-size: 13px; color: var(--muted); margin-top: 8px; word-break: break-all; }
+
+  /* drawings */
+  .empty {
+    height: 100%; min-height: 360px; display: grid; place-items: center; text-align: center;
+    border: 3px dashed #c5cde0; border-radius: 20px; background: #fbfcff; color: var(--muted); padding: 30px;
+  }
+  .empty svg { width: 80px; height: 80px; color: #9fb0d6; }
+  .empty h2 { color: var(--ink); margin: 12px 0 6px; font-size: 22px; }
+  .empty .btn { width: auto; display: inline-flex; margin: 14px 6px 0; }
+  body.dragging .empty, body.dragging main { outline: 4px solid var(--accent); outline-offset: -4px; border-radius: 20px; }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; display: flex; flex-direction: column; }
+  .card-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  .card-head .fig { font-weight: 800; }
+  .card-head .vname { color: var(--muted); font-size: 14px; }
+  .card-head .tools { margin-left: auto; display: flex; gap: 6px; }
+  .card-body { position: relative; aspect-ratio: 4 / 3; }
+  .card-body canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: crosshair; touch-action: none; }
+  .card-body canvas.grab { cursor: grab; }
+  .card-foot { font-size: 12px; color: var(--muted); padding: 6px 10px; border-top: 1px solid var(--line); }
+
+  /* parts */
+  .newchip {
+    width: 100%; border: 2px dashed #b8c6ea; border-radius: 12px; background: #fff; padding: 9px;
+    font-weight: 700; color: var(--accent); display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .newchip.on { border-style: solid; border-color: var(--accent); background: var(--accent-soft); }
+  .parts { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+  .part { display: flex; align-items: center; gap: 6px; border: 2px solid transparent; border-radius: 12px; padding: 3px; }
+  .part.on { border-color: var(--accent); background: var(--accent-soft); }
+  .part .num {
+    flex: none; width: 46px; height: 36px; border-radius: 10px; border: 1px solid var(--line);
+    background: #fff; font-weight: 800; font-size: 16px; color: var(--ink);
+  }
+  .part.on .num { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .part input { flex: 1; min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; }
+  .part input.missing { border-color: var(--warn); background: #fff8ef; }
+  .part .cnt { font-size: 11px; color: var(--muted); flex: none; width: 28px; text-align: center; }
+  .part .del { flex: none; border: 0; background: none; color: #a0a8ba; padding: 4px; }
+  .part .del:hover { color: var(--danger); }
+  .part .del svg { width: 18px; height: 18px; }
+  .noparts { color: var(--muted); font-size: 13px; text-align: center; padding: 8px 0 2px; }
+
+  .notice { font-size: 12px; color: var(--muted); background: #f6f7fa; border-radius: 10px; padding: 8px 10px; margin-top: 10px; line-height: 1.5; }
+
+  /* toast */
+  #toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px);
+    background: #1d2433; color: #fff; padding: 11px 18px; border-radius: 12px; font-size: 14px;
+    opacity: 0; pointer-events: none; transition: .25s; z-index: 50; max-width: 90vw;
+  }
+  #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  #busy { position: fixed; inset: 0; background: rgba(244,246,251,.7); display: none; place-items: center; z-index: 40; font-weight: 700; font-size: 18px; }
+  #busy.show { display: grid; }
+
+  dialog { border: 0; border-radius: 18px; padding: 0; width: min(900px, 94vw); max-height: 92vh; }
+  dialog::backdrop { background: rgba(20, 26, 40, .55); }
+  .dlg-head { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: #fff; z-index: 1; }
+  .dlg-head h3 { margin: 0; font-size: 17px; }
+  .dlg-head .btn { width: auto; margin: 0; }
+  .dlg-head .sp { flex: 1; }
+  .pages { padding: 18px; background: #e9ecf3; display: flex; flex-wrap: wrap; gap: 18px; justify-content: center; }
+  .pages figure { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+  .pages canvas { width: 380px; max-width: 100%; height: auto; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); display: block; margin-bottom: 6px; }
+
+  @media (max-width: 1100px) {
+    .app { grid-template-columns: 1fr; height: auto; }
+    aside { overflow: visible; }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<header>
+  <h1>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg>
+    특허도면 변환기
+  </h1>
+  <div class="who">
+    <label>이름 <input id="studentName" placeholder="예) 김민준" maxlength="20"></label>
+    <label>발명 이름 <input id="inventionName" placeholder="예) 비누 받침대" maxlength="30"></label>
+  </div>
+</header>
+
+<div class="app">
+  <aside>
+    <div class="box">
+      <p class="step"><b>1</b> 모델 올리기</p>
+      <button class="btn primary big" id="pickBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m0 0-5 5m5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+        STL 파일 고르기
+      </button>
+      <button class="btn" id="sampleBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="11" width="18" height="6" rx="1"/><path d="M6 11V8m4 3V8m4 3V8m4 3V8"/></svg>
+        예시 모델로 해보기
+      </button>
+      <input type="file" id="fileInput" accept=".stl,.obj" hidden>
+      <div class="fileinfo" id="fileInfo"></div>
+      <p class="hint">팅커캐드에서 <b>내보내기 → .STL</b>로 저장한 파일을 쓰세요. 화면에 끌어다 놓아도 됩니다.</p>
+    </div>
+
+    <div class="box">
+      <p class="step"><b>2</b> 모양 맞추기</p>
+      <div class="rot">
+        <button id="rotX" title="앞쪽으로 90도 눕혀요" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 8-8"/><path d="M12 1v6H6" transform="rotate(-90 12 4)"/></svg>
+          앞으로 눕히기
+        </button>
+        <button id="rotY" title="옆으로 90도 눕혀요" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-8-8"/><path d="m12 1 3 3-3 3"/></svg>
+          옆으로 눕히기
+        </button>
+        <button id="rotZ" title="바닥에 놓인 채로 90도 돌려요" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="14" rx="9" ry="4"/><path d="m17 8 3 2-3 2" transform="translate(-1 6)"/><path d="M12 4v6"/></svg>
+          빙글 돌리기
+        </button>
+      </div>
+      <div class="sub">선 굵기</div>
+      <div class="seg" id="thickSeg">
+        <button data-v="1">얇게</button>
+        <button data-v="1.5" class="on">보통</button>
+        <button data-v="2.3">굵게</button>
+      </div>
+      <div class="sub">넣을 도면</div>
+      <div class="views" id="viewChecks"></div>
+      <p class="hint">사시도는 그림을 <b>끌어서</b> 보는 방향을 바꿀 수 있어요.</p>
+    </div>
+  </aside>
+
+  <main id="main">
+    <div class="empty" id="emptyState">
+      <div>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="m3 7 9 5 9-5M12 12v10"/></svg>
+        <h2>내 발명품 3D 파일을 올려 주세요</h2>
+        <div>STL 파일을 여기로 끌어오면 도면 4장이 바로 만들어져요.</div>
+        <button class="btn primary" id="pickBtn2">파일 고르기</button>
+        <button class="btn" id="sampleBtn2">예시 모델 보기</button>
+      </div>
+    </div>
+    <div class="grid" id="grid" hidden></div>
+  </main>
+
+  <aside>
+    <div class="box">
+      <p class="step"><b>3</b> 번호 붙이기</p>
+      <button class="newchip on" id="newChip">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        새 번호
+      </button>
+      <div class="parts" id="parts"></div>
+      <p class="hint" id="partsHint">도면에서 부품을 누르면 번호와 선이 생겨요. 같은 부품을 다른 도면에도 붙이려면 왼쪽 번호를 먼저 누르세요.</p>
+      <div class="row" style="margin-top:10px">
+        <button class="btn" id="undoBtn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></svg>
+          되돌리기
+        </button>
+      </div>
+      <p class="hint">번호는 끌어서 옮기고, 두 번 누르면 지워져요.</p>
+    </div>
+
+    <div class="box">
+      <p class="step"><b>4</b> 내보내기</p>
+      <div class="sub" style="margin-top:0">종이 배치</div>
+      <div class="seg" id="layoutSeg">
+        <button data-v="single" class="on">한 장에 하나</button>
+        <button data-v="grid">한 장에 모아서</button>
+      </div>
+      <div class="views" style="grid-template-columns:1fr; margin-top:8px">
+        <label><input type="checkbox" id="optDesc" checked> 설명 쪽 넣기 (도면·부호 설명)</label>
+        <label><input type="checkbox" id="optName"> 도면 아래에 이름 쓰기 (예: 도 1 사시도)</label>
+      </div>
+      <button class="btn primary big" id="pdfBtn" disabled style="margin-top:12px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M12 11v6m0 0-3-3m3 3 3-3"/></svg>
+        전체 도면 내보내기 (PDF)
+      </button>
+      <div class="row" style="margin-top:8px">
+        <button class="btn" id="previewBtn" disabled>미리보기</button>
+        <button class="btn" id="pngBtn" disabled>그림 파일 (PNG)</button>
+      </div>
+      <button class="btn" id="copyBtn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3"/></svg>
+        명세서용 설명 글 복사
+      </button>
+      <div class="notice">A4 용지와 여백(위 2.5, 왼쪽 2.5, 오른쪽 1.5, 아래 1.0cm)을 본뜬 연습용 형식입니다. 실제 출원 전에는 특허청의 최신 도면 기준을 꼭 확인하세요.</div>
+    </div>
+  </aside>
+</div>
+
+<dialog id="previewDlg">
+  <div class="dlg-head">
+    <h3>도면 미리보기</h3>
+    <span class="sp"></span>
+    <button class="btn primary" id="dlgPdf">PDF 저장</button>
+    <button class="btn" id="dlgClose">닫기</button>
+  </div>
+  <div class="pages" id="pages"></div>
+</dialog>
+
+<div id="busy">도면 만드는 중…</div>
+<div id="toast"></div>
+
+<script>
+(() => {
+'use strict';
+
+// ---------- constants ----------
+const TARGET = 1400;   // px across the model's bounding sphere, at full resolution
+const IMG_MARGIN = 8;  // px around each rendered view
+const FS = 46;         // reference-number font size (figure px)
+const PAD = 190;       // free space around a view in the editor, for labels
+const CREASE_DEG = 30; // edges sharper than this are drawn
+
+const VIEWS = [
+  { key: 'persp',  name: '사시도' },
+  { key: 'front',  name: '정면도',   d: [0, 1, 0],  up: [0, 0, 1] },
+  { key: 'back',   name: '배면도',   d: [0, -1, 0], up: [0, 0, 1] },
+  { key: 'left',   name: '좌측면도', d: [1, 0, 0],  up: [0, 0, 1] },
+  { key: 'right',  name: '우측면도', d: [-1, 0, 0], up: [0, 0, 1] },
+  { key: 'top',    name: '평면도',   d: [0, 0, -1], up: [0, 1, 0] },
+  { key: 'bottom', name: '저면도',   d: [0, 0, 1],  up: [0, -1, 0] },
+];
+const VIEW_BY_KEY = Object.fromEntries(VIEWS.map(v => [v.key, v]));
+const DEFAULT_PERSP = { yaw: 38, pitch: 28 };
+
+// ---------- state ----------
+const state = {
+  tris: null,            // Float32Array, raw triangle soup (9 floats per triangle)
+  quat: null,            // model orientation
+  model: null,
+  persp: { ...DEFAULT_PERSP },
+  thick: 1.5,
+  enabled: new Set(['persp', 'front', 'right', 'top']),
+  views: {},             // key -> rendered view
+  parts: [],             // { num, desc }
+  marks: [],             // { view, num, ax, ay, lx, ly, created }
+  active: 'new',         // 'new' or a part number
+  layout: 'single',
+};
+
+const $ = id => document.getElementById(id);
+
+if (!window.THREE) {
+  document.body.innerHTML = '<div style="padding:40px;font-size:18px">도면 엔진(three.js)을 불러오지 못했어요. 인터넷에 한 번 연결한 뒤 다시 열거나, 오프라인용 파일을 사용하세요.</div>';
+  return;
+}
+
+// ---------- ui helpers ----------
+let toastTimer;
+function toast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2600);
+}
+function busy(on) { $('busy').classList.toggle('show', on); }
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => setTimeout(r, 0)));
+function mkCanvas(w, h) {
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w));
+  c.height = Math.max(1, Math.round(h));
+  return c;
+}
+
+// ---------- file parsing ----------
+function parseSTL(buf) {
+  const dv = new DataView(buf);
+  if (buf.byteLength >= 84) {
+    const n = dv.getUint32(80, true);
+    const head = new TextDecoder().decode(new Uint8Array(buf, 0, Math.min(buf.byteLength, 400)));
+    const looksAscii = /^\s*solid/.test(head) && /facet/.test(head);
+    if (84 + n * 50 === buf.byteLength || (!looksAscii && 84 + n * 50 <= buf.byteLength)) {
+      const out = new Float32Array(n * 9);
+      for (let i = 0; i < n; i++) {
+        const o = 84 + i * 50 + 12;
+        for (let k = 0; k < 9; k++) out[i * 9 + k] = dv.getFloat32(o + k * 4, true);
+      }
+      return out;
+    }
+  }
+  const text = new TextDecoder().decode(buf);
+  const re = /vertex\s+([-+\d.eE]+)\s+([-+\d.eE]+)\s+([-+\d.eE]+)/g;
+  const v = [];
+  let m;
+  while ((m = re.exec(text))) v.push(+m[1], +m[2], +m[3]);
+  return new Float32Array(v.slice(0, v.length - v.length % 9));
+}
+
+function parseOBJ(buf) {
+  const lines = new TextDecoder().decode(buf).split(/\r?\n/);
+  const vs = [], out = [];
+  for (const ln of lines) {
+    const p = ln.trim().split(/\s+/);
+    if (p[0] === 'v') vs.push([+p[1], +p[2], +p[3]]);
+    else if (p[0] === 'f') {
+      const idx = p.slice(1).map(s => {
+        const i = parseInt(s, 10);
+        return i < 0 ? vs.length + i : i - 1;
+      });
+      for (let k = 1; k + 1 < idx.length; k++) {
+        for (const i of [idx[0], idx[k], idx[k + 1]]) out.push(...(vs[i] || [0, 0, 0]));
+      }
+    }
+  }
+  // OBJ files are usually Y-up; tool works Z-up like Tinkercad STL
+  const f = new Float32Array(out);
+  for (let i = 0; i < f.length; i += 3) { const y = f[i + 1]; f[i + 1] = -f[i + 2]; f[i + 2] = y; }
+  return f;
+}
+
+function sampleTris() {
+  const parts = [];
+  const add = (g, x, y, z) => {
+    const ng = g.index ? g.toNonIndexed() : g;
+    ng.translate(x, y, z);
+    parts.push(ng.attributes.position.array);
+  };
+  add(new THREE.BoxGeometry(100, 70, 8), 0, 0, 10);            // tray
+  for (let i = -2; i <= 2; i++) add(new THREE.BoxGeometry(6, 58, 5), i * 18, -4, 16.5); // ridges
+  add(new THREE.BoxGeometry(100, 6, 22), 0, 32, 25);           // back wall
+  for (const [x, y] of [[-40, -26], [40, -26], [-40, 26], [40, 26]]) {
+    const c = new THREE.CylinderGeometry(5, 5, 6, 24);
+    c.rotateX(Math.PI / 2);
+    add(c, x, y, 3);                                           // feet
+  }
+  const len = parts.reduce((s, a) => s + a.length, 0);
+  const out = new Float32Array(len);
+  let o = 0;
+  for (const a of parts) { out.set(a, o); o += a.length; }
+  return out;
+}
+
+// ---------- model ----------
+function buildModel(src, quat) {
+  const m = new THREE.Matrix4().makeRotationFromQuaternion(quat).elements;
+  const nT = src.length / 9;
+  const T = new Float32Array(src.length);
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < src.length; i += 3) {
+    const x = src[i], y = src[i + 1], z = src[i + 2];
+    const X = m[0] * x + m[4] * y + m[8] * z;
+    const Y = m[1] * x + m[5] * y + m[9] * z;
+    const Z = m[2] * x + m[6] * y + m[10] * z;
+    T[i] = X; T[i + 1] = Y; T[i + 2] = Z;
+    if (X < mn[0]) mn[0] = X; if (X > mx[0]) mx[0] = X;
+    if (Y < mn[1]) mn[1] = Y; if (Y > mx[1]) mx[1] = Y;
+    if (Z < mn[2]) mn[2] = Z; if (Z > mx[2]) mx[2] = Z;
+  }
+  const diag = Math.hypot(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]) || 1;
+  const inv = 1 / (diag * 1e-6);
+
+  // merge identical vertices so faces share edges
+  const vmap = new Map();
+  const pos = [];
+  const faces = new Uint32Array(nT * 3);
+  const fn = new Float32Array(nT * 3);
+  let fc = 0;
+  const id = [0, 0, 0];
+  for (let t = 0; t < nT; t++) {
+    for (let k = 0; k < 3; k++) {
+      const o = t * 9 + k * 3;
+      const key = Math.round(T[o] * inv) + ',' + Math.round(T[o + 1] * inv) + ',' + Math.round(T[o + 2] * inv);
+      let v = vmap.get(key);
+      if (v === undefined) { v = pos.length / 3; pos.push(T[o], T[o + 1], T[o + 2]); vmap.set(key, v); }
+      id[k] = v;
+    }
+    if (id[0] === id[1] || id[1] === id[2] || id[0] === id[2]) continue;
+    const o = t * 9;
+    const ux = T[o + 3] - T[o], uy = T[o + 4] - T[o + 1], uz = T[o + 5] - T[o + 2];
+    const vx = T[o + 6] - T[o], vy = T[o + 7] - T[o + 1], vz = T[o + 8] - T[o + 2];
+    let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const l = Math.hypot(nx, ny, nz);
+    if (l < 1e-12) continue;
+    faces[fc * 3] = id[0]; faces[fc * 3 + 1] = id[1]; faces[fc * 3 + 2] = id[2];
+    fn[fc * 3] = nx / l; fn[fc * 3 + 1] = ny / l; fn[fc * 3 + 2] = nz / l;
+    fc++;
+  }
+  const P = new Float32Array(pos);
+  const F = faces.slice(0, fc * 3);
+  const N = fn.slice(0, fc * 3);
+  const nv = P.length / 3;
+
+  // edge -> adjacent faces
+  const emap = new Map();
+  const E = [];
+  for (let f = 0; f < fc; f++) {
+    for (let k = 0; k < 3; k++) {
+      const a = F[f * 3 + k], b = F[f * 3 + (k + 1) % 3];
+      const lo = a < b ? a : b, hi = a < b ? b : a;
+      const key = lo * nv + hi;
+      const ei = emap.get(key);
+      if (ei === undefined) { emap.set(key, E.length / 4); E.push(lo, hi, f, -1); }
+      else if (E[ei * 4 + 3] === -1) E[ei * 4 + 3] = f;
+      else E[ei * 4 + 3] = -2;
+    }
+  }
+  const edges = new Int32Array(E);
+  const ne = edges.length / 4;
+  const crease = new Uint8Array(ne);
+  const cosT = Math.cos(CREASE_DEG * Math.PI / 180);
+  for (let e = 0; e < ne; e++) {
+    const f1 = edges[e * 4 + 2], f2 = edges[e * 4 + 3];
+    if (f2 < 0) { crease[e] = 1; continue; }
+    const d = N[f1 * 3] * N[f2 * 3] + N[f1 * 3 + 1] * N[f2 * 3 + 1] + N[f1 * 3 + 2] * N[f2 * 3 + 2];
+    crease[e] = d < cosT ? 1 : 0;
+  }
+
+  const center = new THREE.Vector3((mn[0] + mx[0]) / 2, (mn[1] + mx[1]) / 2, (mn[2] + mx[2]) / 2);
+  let r2 = 0;
+  for (let i = 0; i < P.length; i += 3) {
+    const d = (P[i] - center.x) ** 2 + (P[i + 1] - center.y) ** 2 + (P[i + 2] - center.z) ** 2;
+    if (d > r2) r2 = d;
+  }
+  const radius = Math.sqrt(r2) || 1;
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  geo.setIndex(new THREE.BufferAttribute(F, 1));
+
+  return { P, F, N, edges, crease, center, radius, geo, ppu: TARGET / (2 * radius), faces: fc, size: [mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]] };
+}
+
+// ---------- rendering ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1);
+renderer.setClearColor(0xffffff, 1);
+const scene = new THREE.Scene();
+const whiteMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
+const blackMat = new THREE.MeshBasicMaterial({ color: 0x000000, side: THREE.DoubleSide });
+const lineMat = new THREE.LineBasicMaterial({ color: 0x000000 });
+const mesh = new THREE.Mesh(new THREE.BufferGeometry(), whiteMat);
+const lines = new THREE.LineSegments(new THREE.BufferGeometry(), lineMat);
+scene.add(mesh, lines);
+
+function viewDir(key) {
+  if (key === 'persp') {
+    const y = state.persp.yaw * Math.PI / 180, p = state.persp.pitch * Math.PI / 180;
+    const eye = new THREE.Vector3(Math.sin(y) * Math.cos(p), -Math.cos(y) * Math.cos(p), Math.sin(p));
+    return { d: eye.negate(), up: new THREE.Vector3(0, 0, 1) };
+  }
+  const v = VIEW_BY_KEY[key];
+  return { d: new THREE.Vector3(...v.d), up: new THREE.Vector3(...v.up) };
+}
+
+// Visible line set for one viewing direction: outlines (silhouettes), sharp edges, open borders.
+function edgeLines(model, d) {
+  const { P, N, edges, crease } = model;
+  const ne = edges.length / 4;
+  const out = new Float32Array(ne * 6);
+  let n = 0;
+  for (let e = 0; e < ne; e++) {
+    const f1 = edges[e * 4 + 2], f2 = edges[e * 4 + 3];
+    let draw;
+    if (f2 < 0) draw = true;
+    else {
+      const s1 = N[f1 * 3] * d.x + N[f1 * 3 + 1] * d.y + N[f1 * 3 + 2] * d.z;
+      const s2 = N[f2 * 3] * d.x + N[f2 * 3 + 1] * d.y + N[f2 * 3 + 2] * d.z;
+      const front1 = s1 < 0, front2 = s2 < 0;
+      draw = front1 !== front2 || (crease[e] && (front1 || front2));
+    }
+    if (!draw) continue;
+    const a = edges[e * 4] * 3, b = edges[e * 4 + 1] * 3;
+    out[n++] = P[a]; out[n++] = P[a + 1]; out[n++] = P[a + 2];
+    out[n++] = P[b]; out[n++] = P[b + 1]; out[n++] = P[b + 2];
+  }
+  return out.subarray(0, n);
+}
+
+function thicken(src, w, h, r) {
+  const c = mkCanvas(w, h);
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff';
+  x.fillRect(0, 0, c.width, c.height);
+  x.globalCompositeOperation = 'darken';
+  const R = Math.ceil(r);
+  for (let dy = -R; dy <= R; dy++)
+    for (let dx = -R; dx <= R; dx++)
+      if (dx * dx + dy * dy <= r * r + 0.01) x.drawImage(src, dx, dy);
+  x.globalCompositeOperation = 'source-over';
+  const img = x.getImageData(0, 0, c.width, c.height);
+  const a = img.data;
+  for (let i = 0; i < a.length; i += 4) {
+    let v = a[i];
+    v = v < 110 ? 0 : v > 235 ? 255 : (v - 110) * 255 / 125;
+    a[i] = a[i + 1] = a[i + 2] = v;
+  }
+  x.putImageData(img, 0, 0);
+  return c;
+}
+
+// q != 1 renders at another scale: a quick low-res preview while dragging, or the exact
+// scale of a printed sheet (lineR then sets the stroke radius in output px).
+function renderView(key, q = 1, lineR = null) {
+  const model = state.model;
+  const { d, up } = viewDir(key);
+  d.normalize();
+  const R = new THREE.Vector3().crossVectors(d, up).normalize();
+  const U = new THREE.Vector3().crossVectors(R, d);
+  const { P, center, radius } = model;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (let i = 0; i < P.length; i += 3) {
+    const vx = P[i] - center.x, vy = P[i + 1] - center.y, vz = P[i + 2] - center.z;
+    const px = vx * R.x + vy * R.y + vz * R.z;
+    const py = vx * U.x + vy * U.y + vz * U.z;
+    if (px < x0) x0 = px; if (px > x1) x1 = px;
+    if (py < y0) y0 = py; if (py > y1) y1 = py;
+  }
+  const ppuFull = model.ppu;
+  const W = Math.ceil((x1 - x0) * ppuFull + 2 * IMG_MARGIN);
+  const H = Math.ceil((y1 - y0) * ppuFull + 2 * IMG_MARGIN);
+  const w = Math.max(2, Math.round(W * q)), h = Math.max(2, Math.round(H * q));
+  const m = IMG_MARGIN / ppuFull;
+  const left = x0 - m, top = y1 + m;
+  const cam = new THREE.OrthographicCamera(left, left + W / ppuFull, top, top - H / ppuFull, radius * 0.5, radius * 4 + 1);
+  cam.up.copy(U);
+  cam.position.copy(center).addScaledVector(d, -(radius * 2 + 0.5));
+  cam.lookAt(center);
+  cam.updateProjectionMatrix();
+
+  mesh.geometry = model.geo;
+  lines.geometry.dispose();
+  const lg = new THREE.BufferGeometry();
+  lg.setAttribute('position', new THREE.BufferAttribute(edgeLines(model, d), 3));
+  lines.geometry = lg;
+
+  renderer.setSize(w, h, false);
+  mesh.material = whiteMat;
+  lines.visible = true;
+  renderer.render(scene, cam);
+  const img = thicken(renderer.domElement, w, h, lineR ?? Math.max(0.6, state.thick * q));
+
+  const view = { key, img, W, H };
+  if (q === 1) {
+    mesh.material = blackMat;
+    lines.visible = false;
+    renderer.render(scene, cam);
+    const ms = Math.min(1, 360 / Math.max(W, H));
+    const mw = Math.max(1, Math.round(W * ms)), mh = Math.max(1, Math.round(H * ms));
+    const mc = mkCanvas(mw, mh);
+    const mx = mc.getContext('2d');
+    mx.drawImage(renderer.domElement, 0, 0, mw, mh);
+    const data = mx.getImageData(0, 0, mw, mh).data;
+    const mask = new Uint8Array(mw * mh);
+    let sx = 0, sy = 0, cnt = 0;
+    for (let i = 0; i < mask.length; i++) {
+      if (data[i * 4] < 128) {
+        mask[i] = 1;
+        sx += i % mw; sy += (i / mw) | 0; cnt++;
+      }
+    }
+    Object.assign(view, { mask, mw, mh, ms, cx: cnt ? (sx / cnt + 0.5) / ms : W / 2, cy: cnt ? (sy / cnt + 0.5) / ms : H / 2 });
+    mesh.material = whiteMat;
+    lines.visible = true;
+  }
+  return view;
+}
+
+// ---------- marks geometry ----------
+function isObj(v, x, y) {
+  const mx = Math.floor(x * v.ms), my = Math.floor(y * v.ms);
+  if (mx < 0 || my < 0 || mx >= v.mw || my >= v.mh) return false;
+  return v.mask[my * v.mw + mx] === 1;
+}
+function nearestObj(v, x, y) {
+  let best = null, bd = Infinity;
+  const px = x * v.ms, py = y * v.ms;
+  for (let j = 0; j < v.mh; j++)
+    for (let i = 0; i < v.mw; i++) {
+      if (!v.mask[j * v.mw + i]) continue;
+      const d = (i + 0.5 - px) ** 2 + (j + 0.5 - py) ** 2;
+      if (d < bd) { bd = d; best = [i + 0.5, j + 0.5]; }
+    }
+  return best && { x: best[0] / v.ms, y: best[1] / v.ms };
+}
+function labelSize(num) {
+  const t = String(num);
+  return { hw: t.length * FS * 0.29 + FS * 0.12, hh: FS * 0.5 };
+}
+function autoLabel(v, key, a) {
+  let base = Math.atan2(a.y - v.cy, a.x - v.cx);
+  if (Math.hypot(a.y - v.cy, a.x - v.cx) < 4) base = -Math.PI / 4;
+  const others = state.marks.filter(m => m.view === key);
+  const step = 1 / v.ms;
+  let first = null;
+  for (const t of [0, .35, -.35, .7, -.7, 1.05, -1.05, 1.4, -1.4, 2, -2, Math.PI]) {
+    const ang = base + t, dx = Math.cos(ang), dy = Math.sin(ang);
+    let last = { x: a.x, y: a.y };
+    for (let s = 0; ; s += step) {
+      const x = a.x + dx * s, y = a.y + dy * s;
+      if (x < 0 || y < 0 || x > v.W || y > v.H) break;
+      if (isObj(v, x, y)) last = { x, y };
+    }
+    const cand = { x: last.x + dx * FS * 1.5, y: last.y + dy * FS * 1.5 };
+    if (!first) first = cand;
+    if (others.every(o => Math.hypot(o.lx - cand.x, o.ly - cand.y) > FS * 1.6)) return cand;
+  }
+  return first;
+}
+
+function placeMark(key, p) {
+  const v = state.views[key];
+  if (!v || !v.mask) return;
+  let anchor, label;
+  if (isObj(v, p.x, p.y)) {
+    anchor = p;
+    label = autoLabel(v, key, p);
+  } else {
+    const n = nearestObj(v, p.x, p.y);
+    if (!n) return;
+    const dx = n.x - p.x, dy = n.y - p.y, L = Math.hypot(dx, dy) || 1;
+    if (L > PAD * 2.5) { toast('도면 속 부품을 눌러 주세요'); return; }
+    anchor = { x: n.x + dx / L * 5, y: n.y + dy / L * 5 };
+    label = L < FS * 1.3 ? { x: n.x - dx / L * FS * 1.5, y: n.y - dy / L * FS * 1.5 } : p;
+  }
+  let num = state.active, created = false;
+  if (num === 'new') {
+    num = state.parts.length ? Math.max(...state.parts.map(q => q.num)) + 10 : 10;
+    state.parts.push({ num, desc: '' });
+    created = true;
+  }
+  state.marks.push({ view: key, num, ax: anchor.x, ay: anchor.y, lx: label.x, ly: label.y, created });
+  renderParts(created ? num : null);
+  drawCard(key);
+  updateButtons();
+}
+
+// Draw leader lines and reference numbers. s/ox/oy map figure px to target px.
+function drawAnno(ctx, key, s, ox, oy, opt = {}) {
+  const lw = opt.lw ?? Math.max(opt.minLw || 0, (state.thick * 1.3 + 0.6) * s);
+  const fs = opt.font ?? FS * s;   // number height in output px
+  const k = fs / FS;               // label box scale in output px
+  ctx.lineCap = 'round';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${fs}px Arial, sans-serif`;
+  for (const m of state.marks) {
+    if (m.view !== key) continue;
+    const hot = opt.ui && m.num === state.active;
+    const col = hot ? '#2f6fed' : '#000';
+    const L = { x: ox + m.lx * s, y: oy + m.ly * s };
+    const A = { x: ox + m.ax * s, y: oy + m.ay * s };
+    const { hw, hh } = labelSize(m.num);
+    const dx = A.x - L.x, dy = A.y - L.y;
+    const t = Math.min(dx ? hw * k / Math.abs(dx) : Infinity, dy ? hh * k / Math.abs(dy) : Infinity);
+    ctx.strokeStyle = col;
+    ctx.fillStyle = col;
+    ctx.lineWidth = lw;
+    if (t < 1) {
+      const S = { x: L.x + dx * t, y: L.y + dy * t };
+      // gentle curve, the way leader lines are usually drawn in patent figures
+      const mx = (S.x + A.x) / 2, my = (S.y + A.y) / 2;
+      const len = Math.hypot(A.x - S.x, A.y - S.y);
+      const bend = Math.min(len * 0.08, 14 * s * 3);
+      ctx.beginPath();
+      ctx.moveTo(S.x, S.y);
+      ctx.quadraticCurveTo(mx - (A.y - S.y) / len * bend, my + (A.x - S.x) / len * bend, A.x, A.y);
+      ctx.stroke();
+    }
+    ctx.fillText(String(m.num), L.x, L.y + fs * 0.04);
+    if (opt.ui) {
+      ctx.beginPath();
+      ctx.arc(A.x, A.y, Math.max(3, 5 * s), 0, Math.PI * 2);
+      ctx.fillStyle = hot ? '#2f6fed' : '#e0464b';
+      ctx.fill();
+    }
+  }
+}
+
+function contentRect(key, pad) {
+  const v = state.views[key];
+  let x0 = -pad, y0 = -pad, x1 = v.W + pad, y1 = v.H + pad;
+  for (const m of state.marks) {
+    if (m.view !== key) continue;
+    const { hw, hh } = labelSize(m.num);
+    x0 = Math.min(x0, m.lx - hw - 10, m.ax - 10); x1 = Math.max(x1, m.lx + hw + 10, m.ax + 10);
+    y0 = Math.min(y0, m.ly - hh - 10, m.ay - 10); y1 = Math.max(y1, m.ly + hh + 10, m.ay + 10);
+  }
+  return { x0, y0, x1, y1, w: x1 - x0, h: y1 - y0 };
+}
+
+function drawFigure(ctx, key, s, ox, oy, opt = {}) {
+  const v = state.views[key];
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(opt.img || v.img, ox, oy, v.W * s, v.H * s);
+  drawAnno(ctx, key, s, ox, oy, opt);
+}
+
+// ---------- cards ----------
+const cards = {};
+
+function enabledKeys() { return VIEWS.map(v => v.key).filter(k => state.enabled.has(k)); }
+function figNo(key) { return enabledKeys().indexOf(key) + 1; }
+
+function buildGrid() {
+  const grid = $('grid');
+  grid.innerHTML = '';
+  for (const key of enabledKeys()) {
+    const card = document.createElement('div');
+    card.className = 'card';
+    const persp = key === 'persp';
+    card.innerHTML = `
+      <div class="card-head">
+        <span class="fig">도 ${figNo(key)}</span><span class="vname">${VIEW_BY_KEY[key].name}</span>
+        <span class="tools">
+          ${persp ? '<button class="icon-btn" data-act="reset" title="처음 각도로"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>각도</button>' : ''}
+          <button class="icon-btn" data-act="png" title="이 도면만 PNG로 저장"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11m0 0-4-4m4 4 4-4M5 20h14"/></svg>PNG</button>
+        </span>
+      </div>
+      <div class="card-body"><canvas class="${persp ? 'grab' : ''}"></canvas></div>
+      ${persp ? '<div class="card-foot">끌면 돌아가고, 누르면 번호가 붙어요</div>' : ''}`;
+    grid.appendChild(card);
+    const canvas = card.querySelector('canvas');
+    cards[key] = { canvas, xf: null };
+    attachPointer(key, canvas);
+    card.querySelector('[data-act="png"]').onclick = () => exportPNG([key]);
+    const rb = card.querySelector('[data-act="reset"]');
+    if (rb) rb.onclick = () => {
+      state.persp = { ...DEFAULT_PERSP };
+      clearViewMarks('persp');
+      state.views.persp = renderView('persp');
+      drawCard('persp');
+    };
+  }
+  for (const k of Object.keys(cards)) if (!state.enabled.has(k)) delete cards[k];
+  drawAllCards();
+}
+
+function drawCard(key) {
+  const c = cards[key], v = state.views[key];
+  if (!c || !v) return;
+  const r = c.canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  const cw = Math.max(1, Math.round(r.width * dpr)), ch = Math.max(1, Math.round(r.height * dpr));
+  if (c.canvas.width !== cw || c.canvas.height !== ch) { c.canvas.width = cw; c.canvas.height = ch; }
+  const ctx = c.canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, cw, ch);
+  const rect = contentRect(key, PAD);
+  const s = Math.min(cw / rect.w, ch / rect.h);
+  const ox = (cw - rect.w * s) / 2 - rect.x0 * s;
+  const oy = (ch - rect.h * s) / 2 - rect.y0 * s;
+  c.xf = { s, ox, oy, dpr };
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(v.img, ox, oy, v.W * s, v.H * s);
+  drawAnno(ctx, key, s, ox, oy, { ui: true, minLw: 1.2 * dpr });
+}
+function drawAllCards() { for (const k of Object.keys(cards)) drawCard(k); }
+
+function attachPointer(key, canvas) {
+  let drag = null;
+  const toFig = e => {
+    const c = cards[key], r = canvas.getBoundingClientRect();
+    const { s, ox, oy, dpr } = c.xf;
+    return { x: ((e.clientX - r.left) * dpr - ox) / s, y: ((e.clientY - r.top) * dpr - oy) / s };
+  };
+  const tol = () => 10 * cards[key].xf.dpr / cards[key].xf.s;
+  const hitLabel = p => {
+    const t = tol();
+    for (let i = state.marks.length - 1; i >= 0; i--) {
+      const m = state.marks[i];
+      if (m.view !== key) continue;
+      const { hw, hh } = labelSize(m.num);
+      if (Math.abs(p.x - m.lx) < hw + t * 0.5 && Math.abs(p.y - m.ly) < hh + t * 0.5) return m;
+    }
+    return null;
+  };
+  const hitAnchor = p => {
+    const t = tol();
+    for (let i = state.marks.length - 1; i >= 0; i--) {
+      const m = state.marks[i];
+      if (m.view === key && Math.hypot(p.x - m.ax, p.y - m.ay) < t) return m;
+    }
+    return null;
+  };
+
+  canvas.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || !cards[key].xf) return;
+    const p = toFig(e);
+    const lab = hitLabel(p), anc = lab ? null : hitAnchor(p);
+    drag = { x: e.clientX, y: e.clientY, p, moved: false, lab, anc, yaw: state.persp.yaw, pitch: state.persp.pitch };
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', e => {
+    if (!drag) {
+      const p = cards[key].xf && toFig(e);
+      if (p) canvas.style.cursor = hitLabel(p) || hitAnchor(p) ? 'move' : '';
+      return;
+    }
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 5) return;
+    if (!drag.moved && key === 'persp' && !drag.lab && !drag.anc) clearViewMarks('persp');
+    drag.moved = true;
+    const p = toFig(e);
+    if (drag.lab) { drag.lab.lx = p.x; drag.lab.ly = p.y; drawCard(key); }
+    else if (drag.anc) { drag.anc.ax = p.x; drag.anc.ay = p.y; drawCard(key); }
+    else if (key === 'persp') {
+      state.persp.yaw = drag.yaw - dx * 0.45;
+      state.persp.pitch = Math.max(-80, Math.min(80, drag.pitch + dy * 0.45));
+      if (!drag.raf) drag.raf = requestAnimationFrame(() => {
+        if (!drag) return;
+        drag.raf = 0;
+        state.views.persp = renderView('persp', 0.4);
+        drawCard('persp');
+      });
+    }
+  });
+  const end = e => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    if (d.raf) cancelAnimationFrame(d.raf);
+    if (!d.moved) {
+      if (!d.lab && !d.anc) placeMark(key, d.p);
+      else if (d.lab) setActive(d.lab.num);
+    } else if (key === 'persp' && !d.lab && !d.anc) {
+      state.views.persp = renderView('persp');
+      drawCard('persp');
+    }
+  };
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  const remove = e => {
+    const c = cards[key];
+    if (!c.xf) return;
+    const m = hitLabel(toFig(e));
+    if (!m) return;
+    e.preventDefault();
+    state.marks.splice(state.marks.indexOf(m), 1);
+    renderParts();
+    drawCard(key);
+    updateButtons();
+  };
+  canvas.addEventListener('dblclick', remove);
+  canvas.addEventListener('contextmenu', remove);
+}
+
+function clearViewMarks(key) {
+  const before = state.marks.length;
+  state.marks = state.marks.filter(m => m.view !== key);
+  if (state.marks.length !== before) {
+    toast(`${VIEW_BY_KEY[key].name}의 번호는 각도가 바뀌어서 지웠어요`);
+    renderParts();
+    updateButtons();
+  }
+}
+
+// ---------- parts panel ----------
+function setActive(a) {
+  state.active = a;
+  renderParts();
+  drawAllCards();
+}
+
+function renderParts(focusNum = null) {
+  const box = $('parts');
+  box.innerHTML = '';
+  $('newChip').classList.toggle('on', state.active === 'new');
+  if (!state.parts.length) {
+    box.innerHTML = '<div class="noparts">아직 번호가 없어요</div>';
+    return;
+  }
+  for (const part of [...state.parts].sort((a, b) => a.num - b.num)) {
+    const row = document.createElement('div');
+    row.className = 'part' + (state.active === part.num ? ' on' : '');
+    const cnt = state.marks.filter(m => m.num === part.num).length;
+    row.innerHTML = `<button class="num" title="이 번호를 다른 도면에도 붙이기">${part.num}</button>
+      <input placeholder="이름 (예: 몸통)" maxlength="30">
+      <span class="cnt" title="붙인 곳">${cnt}곳</span>
+      <button class="del" title="번호 지우기"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg></button>`;
+    const inp = row.querySelector('input');
+    inp.value = part.desc;
+    inp.classList.toggle('missing', !part.desc.trim());
+    inp.oninput = () => { part.desc = inp.value; inp.classList.toggle('missing', !inp.value.trim()); };
+    row.querySelector('.num').onclick = () => setActive(state.active === part.num ? 'new' : part.num);
+    row.querySelector('.del').onclick = () => {
+      state.parts = state.parts.filter(q => q !== part);
+      state.marks = state.marks.filter(m => m.num !== part.num);
+      if (state.active === part.num) state.active = 'new';
+      renderParts();
+      drawAllCards();
+      updateButtons();
+    };
+    box.appendChild(row);
+    if (focusNum === part.num) setTimeout(() => inp.focus({ preventScroll: true }), 0);
+  }
+}
+
+$('newChip').onclick = () => setActive('new');
+
+$('undoBtn').onclick = () => {
+  const m = state.marks.pop();
+  if (!m) return;
+  if (m.created && !state.marks.some(q => q.num === m.num)) {
+    state.parts = state.parts.filter(q => q.num !== m.num);
+    if (state.active === m.num) state.active = 'new';
+  }
+  renderParts();
+  drawCard(m.view);
+  updateButtons();
+};
+
+// ---------- loading ----------
+async function loadTris(tris, label) {
+  if (!tris || tris.length < 9) { toast('파일에서 모양을 찾지 못했어요. STL 파일이 맞는지 확인해 주세요.'); return; }
+  busy(true);
+  await nextFrame();
+  try {
+    state.tris = tris;
+    state.quat = new THREE.Quaternion();
+    state.persp = { ...DEFAULT_PERSP };
+    state.parts = [];
+    state.marks = [];
+    state.active = 'new';
+    await rebuild();
+    const s = state.model.size.map(n => Math.round(n * 10) / 10);
+    $('fileInfo').textContent = `${label} · 삼각형 ${state.model.faces.toLocaleString()}개 · ${s[0]}×${s[1]}×${s[2]} mm`;
+    $('emptyState').hidden = true;
+    $('grid').hidden = false;
+    buildGrid();
+    renderParts();
+    updateButtons();
+  } catch (err) {
+    console.error(err);
+    toast('도면을 만드는 중 문제가 생겼어요: ' + err.message);
+  } finally {
+    busy(false);
+  }
+}
+
+async function rebuild() {
+  state.model = buildModel(state.tris, state.quat);
+  state.views = {};
+  for (const k of enabledKeys()) state.views[k] = renderView(k);
+}
+
+async function rerenderAll(msg) {
+  busy(true);
+  await nextFrame();
+  for (const k of enabledKeys()) state.views[k] = renderView(k);
+  busy(false);
+  drawAllCards();
+  if (msg) toast(msg);
+}
+
+async function readFile(file) {
+  if (!file) return;
+  const ext = file.name.toLowerCase().split('.').pop();
+  if (!['stl', 'obj'].includes(ext)) { toast('STL 파일(.stl)을 골라 주세요'); return; }
+  const buf = await file.arrayBuffer();
+  const tris = ext === 'obj' ? parseOBJ(buf) : parseSTL(buf);
+  if (!$('inventionName').value.trim()) {
+    $('inventionName').value = file.name.replace(/\.[^.]+$/, '').slice(0, 30);
+  }
+  loadTris(tris, file.name);
+}
+
+$('pickBtn').onclick = $('pickBtn2').onclick = () => $('fileInput').click();
+$('fileInput').onchange = e => { readFile(e.target.files[0]); e.target.value = ''; };
+$('sampleBtn').onclick = $('sampleBtn2').onclick = () => {
+  if (!$('inventionName').value.trim()) $('inventionName').value = '비누 받침대';
+  loadTris(sampleTris(), '예시 모델 (비누 받침대)');
+};
+
+let dragDepth = 0;
+window.addEventListener('dragenter', e => { e.preventDefault(); dragDepth++; document.body.classList.add('dragging'); });
+window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; document.body.classList.remove('dragging'); } });
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => {
+  e.preventDefault();
+  dragDepth = 0;
+  document.body.classList.remove('dragging');
+  readFile(e.dataTransfer.files[0]);
+});
+
+// ---------- adjust ----------
+async function rotateModel(axis) {
+  if (!state.model) return;
+  if (state.marks.length && !confirm('모델을 돌리면 붙인 번호 위치가 지워져요. 계속할까요? (번호 이름은 남아요)')) return;
+  state.marks = [];
+  const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(...axis), Math.PI / 2);
+  state.quat = q.multiply(state.quat);
+  busy(true);
+  await nextFrame();
+  await rebuild();
+  busy(false);
+  renderParts();
+  drawAllCards();
+  updateButtons();
+}
+$('rotX').onclick = () => rotateModel([1, 0, 0]);
+$('rotY').onclick = () => rotateModel([0, 1, 0]);
+$('rotZ').onclick = () => rotateModel([0, 0, 1]);
+
+for (const b of $('thickSeg').querySelectorAll('button')) {
+  b.onclick = () => {
+    $('thickSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    state.thick = +b.dataset.v;
+    if (state.model) rerenderAll();
+  };
+}
+for (const b of $('layoutSeg').querySelectorAll('button')) {
+  b.onclick = () => {
+    $('layoutSeg').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b));
+    state.layout = b.dataset.v;
+  };
+}
+
+function renderViewChecks() {
+  const box = $('viewChecks');
+  box.innerHTML = '';
+  for (const v of VIEWS) {
+    const l = document.createElement('label');
+    l.innerHTML = `<input type="checkbox" ${state.enabled.has(v.key) ? 'checked' : ''}> ${v.name}`;
+    const inp = l.querySelector('input');
+    inp.onchange = () => {
+      if (!inp.checked && state.enabled.size === 1) { inp.checked = true; toast('도면은 한 장 이상 있어야 해요'); return; }
+      if (inp.checked) state.enabled.add(v.key);
+      else state.enabled.delete(v.key);
+      if (state.model && inp.checked && !state.views[v.key]) state.views[v.key] = renderView(v.key);
+      if (state.model) buildGrid();
+      updateButtons();
+    };
+    box.appendChild(l);
+  }
+}
+
+function updateButtons() {
+  const has = !!state.model;
+  for (const id of ['rotX', 'rotY', 'rotZ', 'pdfBtn', 'previewBtn', 'pngBtn', 'copyBtn']) $(id).disabled = !has;
+  $('undoBtn').disabled = !state.marks.length;
+}
+
+window.addEventListener('resize', () => drawAllCards());
+
+// ---------- sheets & export ----------
+const DPI = 200, MM = DPI / 25.4;
+const PAGE_W = Math.round(210 * MM), PAGE_H = Math.round(297 * MM);
+const MARGIN = { t: 25, l: 25, r: 15, b: 10 }; // mm
+const FONT = '"Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif';
+
+function caption(key) {
+  const n = figNo(key);
+  return $('optName').checked ? `도 ${n} ${VIEW_BY_KEY[key].name}` : `도 ${n}`;
+}
+
+function newPage() {
+  const c = mkCanvas(PAGE_W, PAGE_H);
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff';
+  x.fillRect(0, 0, PAGE_W, PAGE_H);
+  return c;
+}
+
+function makePages() {
+  const figs = enabledKeys().map(k => ({ k, r: contentRect(k, 12) }));
+  const ax = MARGIN.l * MM, ay = MARGIN.t * MM;
+  const aw = (210 - MARGIN.l - MARGIN.r) * MM, ah = (297 - MARGIN.t - MARGIN.b) * MM;
+  const capFont = 5 * MM, capGap = 5 * MM, capH = capFont + capGap;
+  const pages = [];
+
+  // stroke and number sizes fixed on paper, whatever the figure scale
+  const lineR = { 1: 1.0, 1.5: 1.45, 2.3: 2.05 }[state.thick] || 1.45;
+  const anno = { lw: (2 * lineR + 1) * 0.75, font: 0 };
+  const put = (ctx, f, s, cx, cy) => {
+    // center the figure + caption block on (cx, cy)
+    const fw = f.r.w * s, fh = f.r.h * s, total = fh + capH;
+    const left = cx - fw / 2, top = cy - total / 2;
+    const img = renderView(f.k, s, lineR).img;
+    anno.font = Math.max(FS * s, 3.6 * MM);
+    drawFigure(ctx, f.k, s, left - f.r.x0 * s, top - f.r.y0 * s, { img, ...anno });
+    ctx.fillStyle = '#000';
+    ctx.font = `${capFont}px ${FONT}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(caption(f.k), cx, top + fh + capGap);
+  };
+
+  if (state.layout === 'single') {
+    // one scale for every figure so the views stay comparable
+    const s = Math.min(...figs.map(f => Math.min(aw / f.r.w, (ah - capH) / f.r.h * 0.9)));
+    for (const f of figs) {
+      const c = newPage();
+      put(c.getContext('2d'), f, s, ax + aw / 2, ay + ah * 0.45);
+      pages.push(c);
+    }
+  } else {
+    const cols = figs.length === 1 ? 1 : 2;
+    const rows = figs.length <= 2 ? 1 : figs.length <= 4 ? 2 : 3;
+    const per = cols * rows;
+    const cw = aw / cols, ch = ah / rows;
+    const s = Math.min(...figs.map(f => Math.min(cw * 0.88 / f.r.w, (ch * 0.9 - capH) / f.r.h)));
+    for (let i = 0; i < figs.length; i += per) {
+      const c = newPage();
+      const ctx = c.getContext('2d');
+      figs.slice(i, i + per).forEach((f, j) => {
+        const col = j % cols, row = Math.floor(j / cols);
+        put(ctx, f, s, ax + cw * (col + 0.5), ay + ch * (row + 0.5));
+      });
+      pages.push(c);
+    }
+  }
+
+  if ($('optDesc').checked) pages.push(descPage(ax, ay, aw));
+  return pages;
+}
+
+function eunNeun(n) {
+  // 은/는 after a number read in Sino-Korean: 0영 1일 2이 3삼 4사 5오 6육 7칠 8팔 9구, 10십
+  if (n % 10 === 0) return '은';
+  return [null, '은', '는', '은', '는', '는', '은', '은', '은', '는'][n % 10];
+}
+function invention() { return $('inventionName').value.trim() || '발명품'; }
+
+function descLines() {
+  const inv = invention();
+  const out = [{ h: '【도면의 간단한 설명】' }];
+  for (const k of enabledKeys()) {
+    const n = figNo(k);
+    out.push({ t: `도 ${n}${eunNeun(n)} ${inv}의 ${VIEW_BY_KEY[k].name}이다.` });
+  }
+  const parts = [...state.parts].filter(p => state.marks.some(m => m.num === p.num)).sort((a, b) => a.num - b.num);
+  if (parts.length) {
+    out.push({ gap: true }, { h: '【부호의 설명】' });
+    for (const p of parts) out.push({ t: `${p.num}: ${p.desc.trim() || '(이름을 써 주세요)'}` });
+  }
+  return out;
+}
+
+function descPage(ax, ay, aw) {
+  const c = newPage();
+  const x = c.getContext('2d');
+  x.fillStyle = '#000';
+  x.textAlign = 'left';
+  x.textBaseline = 'top';
+  let y = ay;
+  const body = 4.2 * MM, head = 4.8 * MM;
+  for (const ln of descLines()) {
+    if (ln.gap) { y += body; continue; }
+    if (ln.h) { x.font = `bold ${head}px ${FONT}`; x.fillText(ln.h, ax, y); y += head * 1.9; continue; }
+    x.font = `${body}px ${FONT}`;
+    for (const part of wrap(x, ln.t, aw)) { x.fillText(part, ax, y); y += body * 1.7; }
+  }
+  return c;
+}
+
+function wrap(ctx, text, maxW) {
+  const out = [];
+  let cur = '';
+  for (const ch of text) {
+    if (ctx.measureText(cur + ch).width > maxW && cur) { out.push(cur); cur = ch; }
+    else cur += ch;
+  }
+  if (cur) out.push(cur);
+  return out;
+}
+
+function filePrefix() {
+  const clean = s => s.trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '');
+  const parts = [clean($('studentName').value), clean($('inventionName').value)].filter(Boolean);
+  return parts.length ? parts.join('_') : '특허도면';
+}
+
+function warnMissing() {
+  const missing = state.parts.filter(p => !p.desc.trim() && state.marks.some(m => m.num === p.num));
+  if (missing.length) toast(`번호 ${missing.map(p => p.num).join(', ')}의 이름이 비어 있어요`);
+}
+
+function download(url, name) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+async function exportPDF() {
+  if (!window.jspdf) { toast('PDF 도구를 불러오지 못했어요. PNG로 저장해 주세요.'); return; }
+  busy(true);
+  await nextFrame();
+  try {
+    const pages = makePages();
+    const pdf = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+    pages.forEach((c, i) => {
+      if (i) pdf.addPage();
+      pdf.addImage(c.toDataURL('image/png'), 'PNG', 0, 0, 210, 297, undefined, 'FAST');
+    });
+    pdf.save(`${filePrefix()}_도면.pdf`);
+    warnMissing();
+  } finally {
+    busy(false);
+  }
+}
+
+function figureCanvas(key) {
+  const r = contentRect(key, 24);
+  const m = 40, capFont = 52, capGap = 36;
+  const c = mkCanvas(r.w + m * 2, r.h + m * 2 + capFont + capGap);
+  const x = c.getContext('2d');
+  x.fillStyle = '#fff';
+  x.fillRect(0, 0, c.width, c.height);
+  drawFigure(x, key, 1, m - r.x0, m - r.y0);
+  x.fillStyle = '#000';
+  x.font = `${capFont}px ${FONT}`;
+  x.textAlign = 'center';
+  x.textBaseline = 'top';
+  x.fillText(caption(key), c.width / 2, m + r.h + capGap);
+  return c;
+}
+
+async function exportPNG(keys) {
+  for (const k of keys) {
+    const c = figureCanvas(k);
+    const blob = await new Promise(res => c.toBlob(res, 'image/png'));
+    const url = URL.createObjectURL(blob);
+    download(url, `${filePrefix()}_도${figNo(k)}.png`);
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    await new Promise(r => setTimeout(r, 350));
+  }
+  warnMissing();
+}
+
+$('pdfBtn').onclick = exportPDF;
+$('dlgPdf').onclick = exportPDF;
+$('pngBtn').onclick = () => exportPNG(enabledKeys());
+$('previewBtn').onclick = async () => {
+  busy(true);
+  await nextFrame();
+  const pages = makePages();
+  const box = $('pages');
+  box.innerHTML = '';
+  pages.forEach((c, i) => {
+    const f = document.createElement('figure');
+    f.appendChild(c);
+    f.appendChild(document.createTextNode(`${i + 1}쪽`));
+    box.appendChild(f);
+  });
+  busy(false);
+  $('previewDlg').showModal();
+};
+$('dlgClose').onclick = () => $('previewDlg').close();
+
+$('copyBtn').onclick = async () => {
+  const text = descLines().map(l => l.gap ? '' : l.h || l.t).join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    ta.remove();
+  }
+  toast('설명 글을 복사했어요. 명세서에 붙여 넣으세요.');
+};
+
+renderViewChecks();
+renderParts();
+updateButtons();
+
+// test hook
+window.__patent = { state, loadTris, sampleTris, makePages, placeMark };
+})();
+</script>
+</body>
+</html>
